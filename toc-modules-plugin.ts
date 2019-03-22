@@ -30,12 +30,12 @@ export class TocModulesPlugin extends RendererComponent {
 
     const trail: Reflection[] = [];
 
-    while (model !== page.project) {
+    while (model.kind !== 0 && model !== page.project) {
       const isModule = model.kindOf(ReflectionKind.SomeModule);
 
       trail.unshift(model);
       model = model.parent;
-      
+
       if (isModule) {
         break;
       }
@@ -72,7 +72,7 @@ export class TocModulesPlugin extends RendererComponent {
         if (trail.includes(child)) {
           item.isInPath = true;
           item.isCurrent = trail[trail.length - 1] === child;
-      
+
           TocModulesPlugin.buildToc(child, trail, item);
         }
       });

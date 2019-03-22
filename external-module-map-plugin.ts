@@ -1,15 +1,15 @@
-import * as path from "path";
-import * as fs from "fs";
-import * as marked from "marked";
+import * as path from 'path';
+import * as fs from 'fs';
+import * as marked from 'marked';
 
-import { Reflection } from "typedoc/dist/lib/models/reflections/abstract";
-import { Component, ConverterComponent } from "typedoc/dist/lib/converter/components";
-import { Converter } from "typedoc/dist/lib/converter/converter";
-import { Context } from "typedoc/dist/lib/converter/context";
-import { CommentPlugin } from "typedoc/dist/lib/converter/plugins/CommentPlugin";
-import { Comment } from "typedoc/dist/lib/models/comments";
-import { ContainerReflection } from "typedoc/dist/lib/models/reflections/container";
-import { Options, OptionsReadMode } from "typedoc/dist/lib/utils/options";
+import {Reflection} from 'typedoc/dist/lib/models/reflections/abstract';
+import {Component, ConverterComponent} from 'typedoc/dist/lib/converter/components';
+import {Converter} from 'typedoc/dist/lib/converter/converter';
+import {Context} from 'typedoc/dist/lib/converter/context';
+import {CommentPlugin} from 'typedoc/dist/lib/converter/plugins/CommentPlugin';
+import {Comment} from 'typedoc/dist/lib/models/comments';
+import {ContainerReflection} from 'typedoc/dist/lib/models/reflections/container';
+import {Options, OptionsReadMode} from 'typedoc/dist/lib/utils/options';
 
 interface ModuleRename {
   renameTo: string;
@@ -27,7 +27,7 @@ marked.setOptions({
   breaks: false,
   sanitize: false,
   smartLists: true,
-  smartypants: false,
+  smartypants: false
 });
 
 /**
@@ -38,23 +38,24 @@ marked.setOptions({
  *
  *
  */
-@Component({ name: 'external-module-map' })
+@Component({name: 'external-module-map'})
 export class ExternalModuleMapPlugin extends ConverterComponent {
   /** List of module reflections which are models to rename */
   private moduleRenames: ModuleRename[];
   private externalmap: string;
-  private mapRegEx: RegExp ;
-  private isMappingEnabled: boolean ;
+  private isMappingEnabled: boolean;
   private options: Options;
   private modules: Set<string>;
+  private readmeMap: {[module: string]: string};
 
   initialize() {
     this.modules = new Set();
     this.options = this.application.options;
+    this.readmeMap = {};
     this.listenTo(this.owner, {
       [Converter.EVENT_BEGIN]: this.onBegin,
       [Converter.EVENT_CREATE_DECLARATION]: this.onDeclarationBegin,
-      [Converter.EVENT_RESOLVE_BEGIN]: this.onBeginResolve,
+      [Converter.EVENT_RESOLVE_BEGIN]: this.onBeginResolve
     });
   }
 
@@ -66,15 +67,13 @@ export class ExternalModuleMapPlugin extends ConverterComponent {
   private onBegin(context: Context) {
     this.moduleRenames = [];
     this.options.read({}, OptionsReadMode.Prefetch);
-    this.externalmap = (this.options.getValue('external-modulemap'));
+    this.externalmap = this.options.getValue('external-modulemap');
     if (!!this.externalmap) {
       try {
-        console.log("INFO: applying regexp ", this.externalmap, " to calculate module names");
-        this.mapRegEx = new RegExp(this.externalmap);
         this.isMappingEnabled = true;
-        console.log("INFO: Enabled", this.isMappingEnabled);
+        console.log('INFO: Enabled', this.isMappingEnabled);
       } catch (e) {
-        console.log("WARN: external map not recognized. Not processing.", e);
+        console.log('WARN: external map not recognized. Not processing.', e);
       }
     }
   }
@@ -83,17 +82,21 @@ export class ExternalModuleMapPlugin extends ConverterComponent {
     if (!node || !this.isMappingEnabled)
       return;
     var fileName = node.fileName;
-    let match = this.mapRegEx.exec(fileName);
-    /*
-
-    */
-    if (null != match) {
-      console.log(' Mapping ', fileName, ' ==> ', match[1]);
-      this.modules.add(match[1]);
-      this.moduleRenames.push({
-        renameTo: match[1],
-        reflection: <ContainerReflection>reflection
-      });
+    let mapping = false;
+    for (const [module, regExStr, readme] of this.externalmap) {
+      this.readmeMap[module] = readme;
+      const mapRegEx = new RegExp(regExStr);
+      let match = mapRegEx.exec(fileName);
+      if (null != match) {
+        console.log(' Mapping ', fileName, ' ==> ', module);
+        this.modules.add(module);
+        this.moduleRenames.push({
+          renameTo: module,
+          reflection: reflection as ContainerReflection
+        });
+        mapping = true;
+        break;
+      }
     }
   }
 
@@ -145,14 +148,13 @@ export class ExternalModuleMapPlugin extends ConverterComponent {
       let ref = refsArray
         .filter(ref => ref.name === name)
         .find(ref => ref.originalName[0] === '/') as ContainerReflection;
-      let root = ref.originalName.replace(new RegExp(`${name}.*`, 'gi'), name);
       try {
         // tslint:disable-next-line ban-types
         Object.defineProperty(ref, "kindString", {
           get() { return "Package"; },
           set() { return "Package"; },
         });
-        let readme = fs.readFileSync(path.join(root, 'README.md'));
+        let readme = fs.readFileSync(this.readmeMap[name]);
         ref.comment = new Comment("", marked(readme.toString()));
       } catch(e){
         console.error(`No README found for module "${name}"`);

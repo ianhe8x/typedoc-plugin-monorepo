@@ -4,7 +4,7 @@ const {ExternalModuleMapPlugin} = require("./dist/external-module-map-plugin");
 module.exports = function(PluginHost) {
   const app = PluginHost.owner;
 
-  app.options.addDeclaration({ name: 'external-modulemap', short: 'em' });
+  app.options.addDeclaration({ name: 'external-modulemap', short: 'em', type: 5 });
   app.converter.addComponent('external-module-map', ExternalModuleMapPlugin);
 
   app.renderer.addComponent('toc-modules-plugin', TocModulesPlugin);
